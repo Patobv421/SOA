@@ -62,12 +62,12 @@ public class SolicitudServicio {
 
 		// Regla 3: el articulo debe existir y tener existencias suficientes (servicio de Inventario)
 		ArticuloRespuesta articulo = clienteInventario.obtenerArticulo(peticion.getIdArticulo());
-		if (articulo.getCantidadDisponible() < peticion.getCantidad()) {
+		if (articulo.getCantidadBuenEstado() < peticion.getCantidad()) {
 			throw new ErrorNegocioException(HttpStatus.UNPROCESSABLE_ENTITY, "No hay existencias suficientes del articulo");
 		}
 
 		// Se aparta el material en el inventario y despues se guarda la solicitud
-		clienteInventario.reservar(peticion.getIdOperacion(), peticion.getIdArticulo(), peticion.getCantidad());
+		clienteInventario.reservar(peticion.getIdArticulo(), peticion.getCantidad());
 
 		Solicitud solicitud = new Solicitud();
 		solicitud.setIdSolicitud(peticion.getIdOperacion());
@@ -114,7 +114,7 @@ public class SolicitudServicio {
 		}
 
 		// Primero se libera en el inventario; si falla, la solicitud sigue pendiente
-		clienteInventario.liberar(solicitud.getIdSolicitud(), solicitud.getIdArticulo(), solicitud.getCantidad());
+		clienteInventario.liberar(solicitud.getIdArticulo(), solicitud.getCantidad());
 
 		solicitud.setEstado(Solicitud.CANCELADA);
 		return solicitudRepositorio.save(solicitud);

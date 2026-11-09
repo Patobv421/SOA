@@ -1,7 +1,7 @@
 package com.proyecto.solicitudes.servicio;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -13,8 +13,12 @@ import org.springframework.web.client.RestClientException;
 import com.proyecto.solicitudes.modelo.ArticuloRespuesta;
 
 // Se comunica con el servicio de Inventario deportivo por REST
+// Usa sus rutas: GET /api/articulos/{id} y PUT /api/articulos/{id}
 @Component
 public class ClienteInventario {
+
+	// Veces que se intenta de nuevo si otro proceso modifico el articulo al mismo tiempo
+	private static final int INTENTOS = 3;
 
 	private final RestClient restClient;
 
@@ -41,35 +45,56 @@ public class ClienteInventario {
 		}
 	}
 
-	// Le pide al inventario que aparte la cantidad para esta solicitud
-	public void reservar(UUID idSolicitud, Long idArticulo, int cantidad) {
-		try {
-			restClient.post()
-				.uri("/api/articulos/{id}/reservar", idArticulo)
-				.body(Map.of("idSolicitud", idSolicitud.toString(), "cantidad", cantidad))
-				.retrieve()
-				.toBodilessEntity();
-		} catch (HttpClientErrorException e) {
-			// El inventario rechazo la reserva (por ejemplo, ya no hay existencias)
-			throw new ErrorNegocioException(HttpStatus.UNPROCESSABLE_ENTITY, "El inventario no pudo reservar el articulo");
-		} catch (RestClientException e) {
-			throw new ErrorNegocioException(HttpStatus.SERVICE_UNAVAILABLE, "El servicio de inventario no esta disponible");
-		}
+	// Reservar es restar la cantidad de las piezas en buen estado
+	public void reservar(Long idArticulo, int cantidad) {
+		cambiarCantidad(idArticulo, -cantidad);
 	}
 
-	// Le pide al inventario que libere SOLO lo que se aparto para esta solicitud
-	public void liberar(UUID idSolicitud, Long idArticulo, int cantidad) {
-		try {
-			restClient.post()
-				.uri("/api/articulos/{id}/liberar", idArticulo)
-				.body(Map.of("idSolicitud", idSolicitud.toString(), "cantidad", cantidad))
-				.retrieve()
-				.toBodilessEntity();
-		} catch (HttpClientErrorException e) {
-			throw new ErrorNegocioException(HttpStatus.UNPROCESSABLE_ENTITY, "El inventario no pudo liberar la reserva");
-		} catch (RestClientException e) {
-			throw new ErrorNegocioException(HttpStatus.SERVICE_UNAVAILABLE, "El servicio de inventario no esta disponible");
+	// Liberar es devolver la cantidad a las piezas en buen estado
+	public void liberar(Long idArticulo, int cantidad) {
+		cambiarCantidad(idArticulo, cantidad);
+	}
+
+	// El inventario no tiene rutas de reservar ni liberar, asi que se lee el articulo
+	// y se manda con el PUT la nueva cantidad en buen estado junto con su version
+	private void cambiarCantidad(Long idArticulo, int diferencia) {
+		for (int intento = 1; intento <= INTENTOS; intento++) {
+
+			ArticuloRespuesta articulo = obtenerArticulo(idArticulo);
+
+			int nuevaCantidad = articulo.getCantidadBuenEstado() + diferencia;
+			if (nuevaCantidad < 0) {
+				throw new ErrorNegocioException(HttpStatus.UNPROCESSABLE_ENTITY, "No hay existencias suficientes del articulo");
+			}
+
+			// El inventario pide todos estos campos y no acepta campos de mas
+			Map<String, Object> datos = new LinkedHashMap<>();
+			datos.put("codigo", articulo.getCodigo());
+			datos.put("nombre", articulo.getNombre());
+			datos.put("deporte", articulo.getDeporte());
+			datos.put("descripcion", articulo.getDescripcion());
+			datos.put("cantidadBuenEstado", nuevaCantidad);
+			datos.put("cantidadMantenimiento", articulo.getCantidadMantenimiento());
+			datos.put("cantidadDanada", articulo.getCantidadDanada());
+			datos.put("version", articulo.getVersion());
+
+			try {
+				restClient.put()
+					.uri("/api/articulos/{id}", idArticulo)
+					.body(datos)
+					.retrieve()
+					.toBodilessEntity();
+				return;
+			} catch (HttpClientErrorException.Conflict e) {
+				// Otro proceso cambio el articulo: se vuelve a leer y se intenta de nuevo
+			} catch (HttpClientErrorException e) {
+				throw new ErrorNegocioException(HttpStatus.UNPROCESSABLE_ENTITY, "El inventario rechazo el cambio de existencias");
+			} catch (RestClientException e) {
+				throw new ErrorNegocioException(HttpStatus.SERVICE_UNAVAILABLE, "El servicio de inventario no esta disponible");
+			}
 		}
+
+		throw new ErrorNegocioException(HttpStatus.CONFLICT, "El articulo se esta modificando, vuelve a intentar");
 	}
 
 }

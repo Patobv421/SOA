@@ -77,28 +77,39 @@ Las respuestas de error tienen este formato:
 - Los datos son obligatorios, la cantidad minima es 1 y la fecha de uso no puede ser pasada.
 - El usuario debe existir y estar **habilitado** (se pregunta al servicio de Usuarios).
 - El usuario no puede pasar su **limite de solicitudes activas** (PENDIENTE o CONFIRMADA).
-- El articulo debe existir y tener **existencias suficientes** (se pregunta al servicio de Inventario).
+- El articulo debe existir y tener **existencias suficientes en buen estado** (se pregunta al servicio de Inventario).
 - **UUID:** si se repite el mismo UUID con los mismos datos se regresa la solicitud ya creada (no se duplica ni se reserva dos veces). Si se repite con datos distintos se responde 409.
-- **Cancelacion:** solo se cancela una solicitud PENDIENTE. Se libera unicamente la reserva de esa solicitud. Cancelar dos veces no libera dos veces. Si el inventario no responde, la solicitud sigue PENDIENTE.
+- **Cancelacion:** solo se cancela una solicitud PENDIENTE. Se devuelve al inventario unicamente la cantidad de esa solicitud. Cancelar dos veces no devuelve dos veces. Si el inventario no responde, la solicitud sigue PENDIENTE.
 - Si otro servicio no responde en 3 segundos (configurable) se regresa 503 y no se guarda nada.
 
-## Lo que este servicio espera de los otros servicios
-Estas rutas **no vienen en el documento**; las supuse para poder integrar. Hay que acordarlas con los companeros del equipo (si cambian, solo se modifican `ClienteUsuarios` y `ClienteInventario`).
+## Conexion con los otros servicios
 
-- Usuarios (Servicio 3), puerto 8083: `GET /api/usuarios/{id}` responde `{ "id", "nombre", "habilitado", "limiteSolicitudes" }`. 404 si no existe.
-- Inventario (Servicio 1), puerto 8081:
-  - `GET /api/articulos/{id}` responde `{ "id", "nombre", "cantidadDisponible" }`. 404 si no existe.
-  - `POST /api/articulos/{id}/reservar` con `{ "idSolicitud", "cantidad" }`. Debe repetirse sin duplicar si llega el mismo `idSolicitud`.
-  - `POST /api/articulos/{id}/liberar` con `{ "idSolicitud", "cantidad" }`. Libera solo lo reservado para esa solicitud.
+### Inventario (Servicio 1), `http://127.0.0.1:9000`
+Ya existe y **no se modifico**. Solicitudes usa solo estas dos rutas que ya tiene:
+- `GET /api/articulos/{id}` para leer el articulo (`cantidadBuenEstado`, `version`, etc.). 404 si no existe.
+- `PUT /api/articulos/{id}` para guardar la nueva cantidad. Hay que mandar todos los campos del articulo, incluida su `version`. Si la version no coincide responde 409.
+
+Como Inventario no tiene rutas de reservar ni liberar, Solicitudes hace esto en `ClienteInventario`:
+- **Reservar:** lee el articulo y lo guarda con `cantidadBuenEstado` menos la cantidad pedida.
+- **Liberar (al cancelar):** lo guarda con `cantidadBuenEstado` mas la cantidad de la solicitud.
+- Si Inventario responde 409 (otro proceso cambio el articulo al mismo tiempo), se lee de nuevo y se intenta hasta 3 veces.
+- Para arrancar Inventario hay que definir la variable `INVENTARIO_DB_PASSWORD` (viene en su `application.properties`).
+
+### Usuarios (Servicio 3), `http://localhost:8083`
+Todavia no hay proyecto, asi que esta ruta es una **suposicion** que hay que acordar con quien lo haga (si cambia, solo se modifica `ClienteUsuarios`):
+- `GET /api/usuarios/{id}` responde `{ "id", "nombre", "habilitado", "limiteSolicitudes" }`. 404 si no existe.
 
 Las direcciones se cambian en `application.properties` (`servicios.usuarios.url` y `servicios.inventario.url`).
 
 ## Pruebas
-Las pruebas estan en `src/test/java/.../SolicitudControladorTests.java` y usan una base H2 en memoria (no necesitan PostgreSQL) y simulan los otros servicios.
+Usan una base H2 en memoria (no necesitan PostgreSQL):
+- `SolicitudControladorTests`: prueban las rutas de este servicio y simulan a Usuarios e Inventario.
+- `ClienteInventarioTests`: levantan un Inventario de mentira con el mismo contrato que el real (GET, PUT con `version`, 409, 404) y prueban reservar, liberar, reintento por conflicto, sin existencias y servicio apagado.
 En NetBeans: clic derecho en el proyecto > **Test**. Con Maven: `mvn test`.
 
 Cubren: solicitud correcta, confirmar, consultar, cancelar, UUID repetido con los mismos datos y con otros datos, datos invalidos, usuario deshabilitado, limite, sin existencias, cancelar una confirmada, y servicios de Usuarios e Inventario apagados.
 
 ## Limitaciones
-- Si la base de datos falla justo despues de reservar en el inventario, el cliente debe reintentar con el mismo UUID (el inventario no duplica la reserva).
+- Inventario no guarda el UUID de la operacion. El UUID evita duplicados **dentro de Solicitudes**, pero si Inventario guarda el cambio y su respuesta se pierde (o la base de Solicitudes falla justo despues de reservar), un reintento con el mismo UUID puede restar otra vez. Para evitarlo por completo, Inventario tendria que ofrecer una ruta de reservar que reciba el UUID.
+- Reservar y liberar cambian `cantidadBuenEstado`: Inventario no distingue entre piezas disponibles y piezas reservadas.
 - No incluye SOAP ni la pagina consumidora: eso no es parte del Servicio 2.

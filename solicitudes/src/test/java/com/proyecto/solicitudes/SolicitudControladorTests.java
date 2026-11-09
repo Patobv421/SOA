@@ -1,7 +1,6 @@
 package com.proyecto.solicitudes;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
@@ -74,7 +73,7 @@ class SolicitudControladorTests {
 			.andExpect(jsonPath("$.idSolicitud").value(id.toString()))
 			.andExpect(jsonPath("$.estado").value("PENDIENTE"));
 
-		verify(clienteInventario, times(1)).reservar(any(), anyLong(), anyInt());
+		verify(clienteInventario, times(1)).reservar(anyLong(), anyInt());
 	}
 
 	@Test
@@ -106,7 +105,7 @@ class SolicitudControladorTests {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.estado").value("CANCELADA"));
 
-		verify(clienteInventario, times(1)).liberar(any(), anyLong(), anyInt());
+		verify(clienteInventario, times(1)).liberar(anyLong(), anyInt());
 	}
 
 	// ---------- UUID y reintentos ----------
@@ -123,7 +122,7 @@ class SolicitudControladorTests {
 
 		// Solo hay una solicitud y solo se reservo una vez
 		assertEquals(1, solicitudRepositorio.count());
-		verify(clienteInventario, times(1)).reservar(any(), anyLong(), anyInt());
+		verify(clienteInventario, times(1)).reservar(anyLong(), anyInt());
 	}
 
 	@Test
@@ -145,7 +144,7 @@ class SolicitudControladorTests {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.estado").value("CANCELADA"));
 
-		verify(clienteInventario, times(1)).liberar(any(), anyLong(), anyInt());
+		verify(clienteInventario, times(1)).liberar(anyLong(), anyInt());
 	}
 
 	// ---------- Casos invalidos ----------
@@ -155,7 +154,7 @@ class SolicitudControladorTests {
 		mockMvc.perform(post("/api/solicitudes").contentType(MediaType.APPLICATION_JSON).content(json(UUID.randomUUID(), 1, 10, 0)))
 			.andExpect(status().isBadRequest());
 
-		verify(clienteInventario, never()).reservar(any(), anyLong(), anyInt());
+		verify(clienteInventario, never()).reservar(anyLong(), anyInt());
 	}
 
 	@Test
@@ -189,7 +188,7 @@ class SolicitudControladorTests {
 		mockMvc.perform(post("/api/solicitudes").contentType(MediaType.APPLICATION_JSON).content(json(UUID.randomUUID(), 2, 10, 1)))
 			.andExpect(status().isUnprocessableEntity());
 
-		verify(clienteInventario, never()).reservar(any(), anyLong(), anyInt());
+		verify(clienteInventario, never()).reservar(anyLong(), anyInt());
 	}
 
 	@Test
@@ -207,7 +206,7 @@ class SolicitudControladorTests {
 		mockMvc.perform(post("/api/solicitudes").contentType(MediaType.APPLICATION_JSON).content(json(UUID.randomUUID(), 1, 10, 6)))
 			.andExpect(status().isUnprocessableEntity());
 
-		verify(clienteInventario, never()).reservar(any(), anyLong(), anyInt());
+		verify(clienteInventario, never()).reservar(anyLong(), anyInt());
 	}
 
 	@Test
@@ -219,7 +218,7 @@ class SolicitudControladorTests {
 		mockMvc.perform(post("/api/solicitudes/" + id + "/cancelar"))
 			.andExpect(status().isConflict());
 
-		verify(clienteInventario, never()).liberar(any(), anyLong(), anyInt());
+		verify(clienteInventario, never()).liberar(anyLong(), anyInt());
 	}
 
 	// ---------- Casos de falla ----------
@@ -238,7 +237,7 @@ class SolicitudControladorTests {
 	@Test
 	void servicio_de_inventario_apagado_no_guarda_la_solicitud() throws Exception {
 		doThrow(new ErrorNegocioException(HttpStatus.SERVICE_UNAVAILABLE, "El servicio de inventario no esta disponible"))
-			.when(clienteInventario).reservar(any(), anyLong(), anyInt());
+			.when(clienteInventario).reservar(anyLong(), anyInt());
 
 		mockMvc.perform(post("/api/solicitudes").contentType(MediaType.APPLICATION_JSON).content(json(UUID.randomUUID(), 1, 10, 1)))
 			.andExpect(status().isServiceUnavailable());
@@ -251,7 +250,7 @@ class SolicitudControladorTests {
 		UUID id = UUID.randomUUID();
 		crearSolicitud(id, 1, 10, 1);
 		doThrow(new ErrorNegocioException(HttpStatus.SERVICE_UNAVAILABLE, "El servicio de inventario no esta disponible"))
-			.when(clienteInventario).liberar(any(), anyLong(), anyInt());
+			.when(clienteInventario).liberar(anyLong(), anyInt());
 
 		mockMvc.perform(post("/api/solicitudes/" + id + "/cancelar"))
 			.andExpect(status().isServiceUnavailable());
@@ -271,7 +270,7 @@ class SolicitudControladorTests {
 	// Arma el JSON de la peticion
 	private String json(UUID id, long idUsuario, long idArticulo, int cantidad) {
 		return "{\"idOperacion\": \"" + id + "\", \"idUsuario\": " + idUsuario + ", \"idArticulo\": " + idArticulo
-                        + ", \"cantidad\": " + cantidad + ", \"fechaUso\": \"" + LocalDate.now().plusDays(1) + "\"}";
+			+ ", \"cantidad\": " + cantidad + ", \"fechaUso\": \"" + LocalDate.now().plusDays(1) + "\"}";
 	}
 
 	private UsuarioRespuesta crearUsuario(boolean habilitado, int limite) {
@@ -287,7 +286,7 @@ class SolicitudControladorTests {
 		ArticuloRespuesta articulo = new ArticuloRespuesta();
 		articulo.setId(10L);
 		articulo.setNombre("Balon de futbol");
-		articulo.setCantidadDisponible(disponibles);
+		articulo.setCantidadBuenEstado(disponibles);
 		return articulo;
 	}
 

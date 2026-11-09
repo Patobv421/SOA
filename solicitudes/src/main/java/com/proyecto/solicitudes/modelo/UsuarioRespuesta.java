@@ -1,6 +1,9 @@
 package com.proyecto.solicitudes.modelo;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 // Datos que regresa el servicio de Usuarios (Servicio 3) cuando le preguntamos por un usuario
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class UsuarioRespuesta {
 
 	private Long id;
