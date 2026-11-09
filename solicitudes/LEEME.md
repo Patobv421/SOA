@@ -96,14 +96,17 @@ Como Inventario no tiene rutas de reservar ni liberar, Solicitudes hace esto en 
 - Para arrancar Inventario hay que definir la variable `INVENTARIO_DB_PASSWORD` (viene en su `application.properties`).
 
 ### Usuarios (Servicio 3), `http://localhost:8083`
-Todavia no hay proyecto, asi que esta ruta es una **suposicion** que hay que acordar con quien lo haga (si cambia, solo se modifica `ClienteUsuarios`):
-- `GET /api/usuarios/{id}` responde `{ "id", "nombre", "habilitado", "limiteSolicitudes" }`. 404 si no existe.
+Ya existe y **no se modifico**. Solicitudes usa solo esta ruta que ya tiene:
+- `GET /api/usuarios/{id}` responde, entre otros campos, `id`, `nombre`, `habilitado` y `limiteSolicitudes`. 404 si no existe. Los demas campos (`matricula`, `tipo`, fechas...) se ignoran.
+
+Con eso Solicitudes decide: si `habilitado` es false responde 422 (por ejemplo, un usuario suspendido por una incidencia no puede pedir material), y si ya tiene `limiteSolicitudes` solicitudes activas tambien responde 422. Si Usuarios esta apagado o tarda mas de 3 segundos responde 503.
 
 Las direcciones se cambian en `application.properties` (`servicios.usuarios.url` y `servicios.inventario.url`).
 
 ## Pruebas
 Usan una base H2 en memoria (no necesitan PostgreSQL):
 - `SolicitudControladorTests`: prueban las rutas de este servicio y simulan a Usuarios e Inventario.
+- `ClienteUsuariosTests`: levantan un Usuarios de mentira con la misma respuesta JSON que el real y prueban usuario habilitado, suspendido, 404, error 500, tiempo de espera agotado y servicio apagado.
 - `ClienteInventarioTests`: levantan un Inventario de mentira con el mismo contrato que el real (GET, PUT con `version`, 409, 404) y prueban reservar, liberar, reintento por conflicto, sin existencias y servicio apagado.
 En NetBeans: clic derecho en el proyecto > **Test**. Con Maven: `mvn test`.
 
