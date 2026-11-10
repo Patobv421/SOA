@@ -207,7 +207,7 @@ async function registrarSolicitud() {
             body: JSON.stringify(payload)
         });
 
-        const idSolicitud = respuesta.id || respuesta.idOperacion || payload.idOperacion;
+        const idSolicitud = respuesta.idSolicitud || respuesta.id || respuesta.idOperacion || payload.idOperacion;
         mostrarMensaje("mensajeSolicitud", `Prestamo registrado con exito. Solicitud #${idSolicitud}`, "exito");
 
         // Rellenar datos en la seccion de devolucion

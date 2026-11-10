@@ -19,12 +19,14 @@ import com.proyecto.solicitudes.servicio.SolicitudServicio;
 import jakarta.validation.Valid;
 
 // Rutas REST del Servicio 2 (Solicitudes)
-// @CrossOrigin permite que una pagina en el puerto 5500 lea las respuestas desde el navegador
 @RestController
 @RequestMapping("/api/solicitudes")
 @CrossOrigin(origins = {
 	"http://localhost:5500",
-	"http://127.0.0.1:5500"
+	"http://127.0.0.1:5500",
+	"http://localhost:9010",
+	"http://127.0.0.1:9010",
+	"*"
 })
 public class SolicitudControlador {
 
