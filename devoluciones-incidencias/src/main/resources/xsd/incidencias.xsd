@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://ejemplo.com/devoluciones/soap"
+           xmlns:tns="http://ejemplo.com/devoluciones/soap"
+           elementFormDefault="qualified">
+
+    <xs:element name="ConsultarIncidenciaRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="folio" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="ConsultarIncidenciaResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="folio" type="xs:string"/>
+                <xs:element name="codigoArticulo" type="xs:string"/>
+                <xs:element name="estadoMaterial" type="xs:string"/>
+                <xs:element name="observaciones" type="xs:string"/>
+                <xs:element name="montoSancion" type="xs:decimal"/>
+                <xs:element name="requiereReposicion" type="xs:boolean"/>
+                <xs:element name="mensajeDictamen" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+</xs:schema>
+

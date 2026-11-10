@@ -1,20 +1,19 @@
-// Consumidor Web - Gestion de Material Deportivo y Devoluciones
+// Consumidor Web - Gestion de Prestamos y Devoluciones
 
-const API_INVENTARIO = "http://localhost:9000/api/articulos";
-const API_INVENTARIO_FALLBACK = "http://localhost:9010/api/devoluciones/inventario";
-
-const API_USUARIOS = "http://localhost:8083/api/usuarios";
-const API_USUARIOS_FALLBACK = "http://localhost:9010/api/devoluciones/usuarios";
-
-const API_SOLICITUDES = "http://localhost:8082/api/solicitudes";
+// Rutas de comunicacion con los servicios
 const API_DEVOLUCIONES = "http://localhost:9010/api/devoluciones";
+const API_SOLICITUDES = "http://localhost:8082/api/solicitudes";
 
-const CLAVE_STORAGE_SOLICITUD = "soa.solicitud.operacion";
+// Consultas de inventario y usuarios a traves del servicio 4 para evitar bloqueos de CORS
+const API_INVENTARIO = "http://localhost:9010/api/devoluciones/inventario";
+const API_USUARIOS = "http://localhost:9010/api/devoluciones/usuarios";
 
-function elemento(id) {
+// Helper para obtener elementos del DOM
+function $(id) {
     return document.getElementById(id);
 }
 
+// Generador simple de identificadores UUID
 function generarUuid() {
     if (window.crypto && crypto.randomUUID) {
         return crypto.randomUUID();
@@ -26,230 +25,172 @@ function generarUuid() {
     });
 }
 
-function mostrarMensaje(idElemento, texto, esError = false) {
-    const el = elemento(idElemento);
+// Muestra mensajes de estado en la interfaz
+function mostrarMensaje(idElemento, texto, tipo = "exito") {
+    const el = $(idElemento);
     if (!el) return;
     el.style.display = "block";
-    el.className = "mensaje-box " + (esError ? "error" : "exito");
+    el.className = "mensaje-box " + tipo;
     el.textContent = texto;
 }
 
-async function solicitarJson(url, opciones = {}) {
-    const controlador = new AbortController();
-    const temporizador = setTimeout(() => controlador.abort(), 6000);
+// Oculta un mensaje de estado
+function ocultarMensaje(idElemento) {
+    const el = $(idElemento);
+    if (el) el.style.display = "none";
+}
 
-    try {
-        const respuesta = await fetch(url, {
-            ...opciones,
-            headers: {
-                "Accept": "application/json",
-                ...(opciones.headers || {})
-            },
-            signal: controlador.signal
-        });
-
-        const texto = await respuesta.text();
-        let datos = null;
-        if (texto) {
-            try {
-                datos = JSON.parse(texto);
-            } catch {
-                datos = { mensaje: texto };
-            }
+// Peticion HTTP con manejo de JSON y respuestas de error
+async function pedirJson(url, opciones = {}) {
+    const respuesta = await fetch(url, {
+        ...opciones,
+        headers: {
+            "Accept": "application/json",
+            ...(opciones.headers || {})
         }
+    });
 
-        if (!respuesta.ok) {
-            let detalle = "Error HTTP " + respuesta.status;
-            if (datos) {
-                if (datos.mensaje) detalle = datos.mensaje;
-                else if (datos.message) detalle = datos.message;
-                else if (datos.error) detalle = datos.error;
-            }
-            const err = new Error(detalle);
-            err.status = respuesta.status;
-            err.datos = datos;
-            throw err;
+    const texto = await respuesta.text();
+    let datos = null;
+    if (texto) {
+        try {
+            datos = JSON.parse(texto);
+        } catch {
+            datos = { mensaje: texto };
         }
+    }
 
-        return datos;
-    } catch (error) {
-        if (error.name === "AbortError") {
-            throw new Error("Tiempo de espera agotado al comunicar con el servicio.");
+    if (!respuesta.ok) {
+        let mensaje = "Error en la comunicacion (" + respuesta.status + ")";
+        if (datos) {
+            mensaje = datos.mensaje || datos.message || datos.error || mensaje;
         }
+        const error = new Error(mensaje);
+        error.status = respuesta.status;
         throw error;
-    } finally {
-        clearTimeout(temporizador);
     }
+
+    return datos;
 }
 
-async function solicitarConFallback(urlDirecta, urlFallback, opciones = {}) {
-    try {
-        return await solicitarJson(urlDirecta, opciones);
-    } catch (err) {
-        if (urlFallback && (err.name === "TypeError" || !err.status || (err.message && err.message.includes("fetch")))) {
-            return await solicitarJson(urlFallback, opciones);
-        }
-        throw err;
-    }
-}
-
-// 1. Consultar Articulo
+// 1. Inventario Deportivo
 async function consultarArticulo() {
-    const id = elemento("articuloId").value;
-    const detalle = elemento("detalleArticulo");
+    const id = $("articuloId").value.trim();
+    const detalle = $("detalleArticulo");
     if (!id) return;
 
     try {
-        mostrarMensaje("mensajeArticulo", "Consultando catalogo...");
-        elemento("mensajeArticulo").className = "mensaje-box info";
+        ocultarMensaje("mensajeArticulo");
+        const articulo = await pedirJson(`${API_INVENTARIO}/${id}`);
 
-        const urlDirecta = `${API_INVENTARIO}/${id}`;
-        const urlFallback = `${API_INVENTARIO_FALLBACK}/${id}`;
-        const articulo = await solicitarConFallback(urlDirecta, urlFallback);
-
-        elemento("artCodigo").textContent = articulo.codigo;
-        elemento("artNombre").textContent = articulo.nombre;
-        elemento("artDeporte").textContent = articulo.deporte || "-";
-        elemento("artBuenEstado").innerHTML = `<span class="badge badge-disponible">${articulo.cantidadBuenEstado} unidades</span>`;
-        elemento("artMantenimiento").innerHTML = `<span class="badge badge-mantenimiento">${articulo.cantidadMantenimiento}</span>`;
-        elemento("artDanadas").innerHTML = `<span class="badge badge-danado">${articulo.cantidadDanada}</span>`;
-
-        // Prellenar formularios relacionados
-        elemento("solIdArticulo").value = articulo.id;
-        elemento("devCodigoArticulo").value = articulo.codigo;
+        $("artCodigo").textContent = articulo.codigo || "-";
+        $("artNombre").textContent = articulo.nombre || "-";
+        $("artDeporte").textContent = articulo.deporte || "-";
+        $("artBuenEstado").textContent = articulo.cantidadBuenEstado ?? 0;
+        $("artMantenimiento").textContent = articulo.cantidadMantenimiento ?? 0;
+        $("artDanadas").textContent = articulo.cantidadDanada ?? 0;
 
         detalle.style.display = "grid";
-        mostrarMensaje("mensajeArticulo", `Articulo [${articulo.codigo}] cargado exitosamente.`);
+
+        // Sugerir datos en los formularios inferiores
+        if ($("solIdArticulo")) $("solIdArticulo").value = articulo.id || id;
+        if ($("devCodigoArticulo")) $("devCodigoArticulo").value = articulo.codigo || "";
+
     } catch (error) {
         if (detalle) detalle.style.display = "none";
-        mostrarMensaje("mensajeArticulo", error.message || "No fue posible consultar el articulo.", true);
+        mostrarMensaje("mensajeArticulo", "No se encontro el articulo: " + error.message, "error");
     }
 }
 
 async function cargarCatalogoCompleto() {
-    const contenedor = elemento("contenedorTablaArticulos");
-    const cuerpo = elemento("cuerpoTablaArticulos");
+    const contenedor = $("contenedorTablaArticulos");
+    const cuerpo = $("cuerpoTablaArticulos");
+    if (!contenedor || !cuerpo) return;
+
+    if (contenedor.style.display === "block") {
+        contenedor.style.display = "none";
+        return;
+    }
 
     try {
-        mostrarMensaje("mensajeArticulo", "Cargando lista de articulos...");
-        elemento("mensajeArticulo").className = "mensaje-box info";
-
-        const articulos = await solicitarConFallback(API_INVENTARIO, API_INVENTARIO_FALLBACK);
+        ocultarMensaje("mensajeArticulo");
+        const lista = await pedirJson(API_INVENTARIO);
         cuerpo.innerHTML = "";
 
-        if (!articulos || articulos.length === 0) {
-            cuerpo.innerHTML = `<tr><td colspan="8" style="text-align:center;">No hay articulos en el catalogo.</td></tr>`;
-        } else {
-            articulos.forEach(art => {
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-                    <td>${art.id}</td>
-                    <td><strong>${art.codigo}</strong></td>
-                    <td>${art.nombre}</td>
-                    <td>${art.deporte || '-'}</td>
-                    <td><span class="badge badge-disponible">${art.cantidadBuenEstado}</span></td>
-                    <td><span class="badge badge-mantenimiento">${art.cantidadMantenimiento}</span></td>
-                    <td><span class="badge badge-danado">${art.cantidadDanada}</span></td>
-                    <td>
-                        <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" onclick="seleccionarArticulo(${art.id})">
-                            Seleccionar
-                        </button>
-                    </td>
-                `;
-                cuerpo.appendChild(tr);
-            });
+        if (!lista || lista.length === 0) {
+            cuerpo.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--muted);">No hay articulos registrados.</td></tr>`;
+            contenedor.style.display = "block";
+            return;
         }
 
+        lista.forEach(item => {
+            const fila = document.createElement("tr");
+            fila.innerHTML = `
+                <td>${item.id}</td>
+                <td><strong>${item.codigo}</strong></td>
+                <td>${item.nombre}</td>
+                <td>${item.deporte}</td>
+                <td style="color: var(--success); font-weight: bold;">${item.cantidadBuenEstado}</td>
+                <td style="color: var(--warning);">${item.cantidadMantenimiento}</td>
+                <td style="color: var(--danger);">${item.cantidadDanada}</td>
+                <td>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="seleccionarArticulo(${item.id}, '${item.codigo}')">Elegir</button>
+                </td>
+            `;
+            cuerpo.appendChild(fila);
+        });
+
         contenedor.style.display = "block";
-        mostrarMensaje("mensajeArticulo", `Se cargaron ${articulos.length} articulos del inventario.`);
     } catch (error) {
-        mostrarMensaje("mensajeArticulo", "Error al cargar el catalogo: " + error.message, true);
+        mostrarMensaje("mensajeArticulo", "Error al cargar catalogo: " + error.message, "error");
     }
 }
 
-function seleccionarArticulo(id) {
-    elemento("articuloId").value = id;
+function seleccionarArticulo(id, codigo) {
+    $("articuloId").value = id;
     consultarArticulo();
+    if ($("solIdArticulo")) $("solIdArticulo").value = id;
+    if ($("devCodigoArticulo")) $("devCodigoArticulo").value = codigo;
 }
 
-// 2. Consultar Usuario
+// 2. Consulta de Usuario
 async function consultarUsuario() {
-    const id = elemento("usuarioId").value;
-    const detalle = elemento("detalleUsuario");
+    const id = $("usuarioId").value.trim();
+    const detalle = $("detalleUsuario");
     if (!id) return;
 
     try {
-        mostrarMensaje("mensajeUsuario", "Consultando usuario...");
-        elemento("mensajeUsuario").className = "mensaje-box info";
+        ocultarMensaje("mensajeUsuario");
+        const usuario = await pedirJson(`${API_USUARIOS}/${id}`);
 
-        const urlDirecta = `${API_USUARIOS}/${id}`;
-        const urlFallback = `${API_USUARIOS_FALLBACK}/${id}`;
-        const usuario = await solicitarConFallback(urlDirecta, urlFallback);
-
-        elemento("usrMatricula").textContent = usuario.matricula;
-        elemento("usrNombre").textContent = usuario.nombre;
-        elemento("usrCorreo").textContent = usuario.correo || "-";
-        elemento("usrTipo").textContent = usuario.tipo;
-
-        const estadoBadge = usuario.estado === "ACTIVO"
-            ? '<span class="badge badge-disponible">ACTIVO</span>'
-            : '<span class="badge badge-danado">' + usuario.estado + '</span>';
-        elemento("usrEstado").innerHTML = estadoBadge;
-
-        const limiteTexto = (usuario.limiteSolicitudes !== undefined) 
-            ? `${usuario.limiteSolicitudes} solicitudes max.`
-            : (usuario.tipo === "DOCENTE" ? "5 solicitudes max." : "3 solicitudes max.");
-        elemento("usrLimite").textContent = limiteTexto;
-
-        // Prellenar formularios relacionados
-        elemento("solIdUsuario").value = usuario.id;
-        elemento("devIdUsuario").value = usuario.id;
+        $("usrMatricula").textContent = usuario.matricula || "-";
+        $("usrNombre").textContent = usuario.nombre || "-";
+        $("usrCorreo").textContent = usuario.correo || "-";
+        $("usrTipo").textContent = usuario.tipo || "-";
+        $("usrEstado").textContent = usuario.estado || "-";
+        $("usrLimite").textContent = usuario.limitePrestamos ?? "-";
 
         detalle.style.display = "grid";
-        mostrarMensaje("mensajeUsuario", `Usuario ${usuario.nombre} verificado.`);
+
+        if ($("solIdUsuario")) $("solIdUsuario").value = usuario.id || id;
+        if ($("devIdUsuario")) $("devIdUsuario").value = usuario.id || id;
+
     } catch (error) {
         if (detalle) detalle.style.display = "none";
-        mostrarMensaje("mensajeUsuario", error.message || "No fue posible consultar el usuario.", true);
+        mostrarMensaje("mensajeUsuario", "No se encontro el usuario: " + error.message, "error");
     }
 }
 
-// 3. Solicitar Prestamo
-function inicializarUuidSolicitud() {
-    let uuid = localStorage.getItem(CLAVE_STORAGE_SOLICITUD);
-    if (!uuid) {
-        uuid = generarUuid();
-        localStorage.setItem(CLAVE_STORAGE_SOLICITUD, uuid);
-    }
-    const banner = elemento("bannerSolicitudPendiente");
-    if (banner) {
-        banner.style.display = "flex";
-        elemento("textoSolicitudPendiente").textContent = "Identificador de operacion: " + uuid.substring(0, 8) + "...";
-    }
-    return uuid;
-}
-
-function generarNuevoIdentificadorOperacion() {
-    const nuevoUuid = generarUuid();
-    localStorage.setItem(CLAVE_STORAGE_SOLICITUD, nuevoUuid);
-    const banner = elemento("bannerSolicitudPendiente");
-    if (banner) {
-        elemento("textoSolicitudPendiente").textContent = "Nuevo identificador: " + nuevoUuid.substring(0, 8) + "...";
-    }
-    mostrarMensaje("mensajeSolicitud", "Identificador renovado para una nueva solicitud.");
-    elemento("mensajeSolicitud").className = "mensaje-box info";
-}
-
+// 3. Solicitud de Prestamo
 async function registrarSolicitud() {
-    const idArticulo = parseInt(elemento("solIdArticulo").value, 10);
-    const idUsuario = parseInt(elemento("solIdUsuario").value, 10);
-    const cantidad = parseInt(elemento("solCantidad").value, 10);
-    const fechaUso = elemento("solFechaUso").value;
-    const btn = elemento("btnSolicitar");
-
-    const idOperacion = localStorage.getItem(CLAVE_STORAGE_SOLICITUD) || generarUuid();
+    const idArticulo = parseInt($("solIdArticulo").value, 10);
+    const idUsuario = parseInt($("solIdUsuario").value, 10);
+    const cantidad = parseInt($("solCantidad").value, 10);
+    const fechaUso = $("solFechaUso").value;
+    const btn = $("btnSolicitar");
 
     const payload = {
-        idOperacion: idOperacion,
+        idOperacion: generarUuid(),
         idArticulo: idArticulo,
         idUsuario: idUsuario,
         cantidad: cantidad,
@@ -258,124 +199,166 @@ async function registrarSolicitud() {
 
     try {
         btn.disabled = true;
-        mostrarMensaje("mensajeSolicitud", "Registrando solicitud de prestamo...");
-        elemento("mensajeSolicitud").className = "mensaje-box info";
+        mostrarMensaje("mensajeSolicitud", "Registrando prestamo...", "info");
 
-        const respuesta = await solicitarJson(API_SOLICITUDES, {
+        const respuesta = await pedirJson(API_SOLICITUDES, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         });
 
-        // Prellenar la devolucion con el id de solicitud devuelto
-        if (respuesta && respuesta.idSolicitud) {
-            elemento("devIdSolicitud").value = respuesta.idSolicitud;
-        } else {
-            elemento("devIdSolicitud").value = idOperacion;
+        const idSolicitud = respuesta.id || respuesta.idOperacion || payload.idOperacion;
+        mostrarMensaje("mensajeSolicitud", `Prestamo registrado con exito. Solicitud #${idSolicitud}`, "exito");
+
+        // Rellenar datos en la seccion de devolucion
+        if ($("devIdSolicitud")) $("devIdSolicitud").value = idSolicitud;
+        if ($("devIdUsuario")) $("devIdUsuario").value = idUsuario;
+
+        const cod = $("artCodigo")?.textContent;
+        if (cod && cod !== "-" && $("devCodigoArticulo")) {
+            $("devCodigoArticulo").value = cod;
         }
 
-        mostrarMensaje(
-            "mensajeSolicitud",
-            `Solicitud registrada con exito. Estado: ${respuesta.estado || 'CONFIRMADA'}. Listo para devolucion.`
-        );
-
-        // Generar nuevo UUID para el siguiente prestamo
-        generarNuevoIdentificadorOperacion();
-        
-        // Actualizar datos del articulo para ver el descuento en inventario
+        // Actualizar datos del articulo para ver el nuevo stock
         consultarArticulo();
+
     } catch (error) {
-        mostrarMensaje("mensajeSolicitud", "No se pudo registrar la solicitud: " + error.message, true);
+        mostrarMensaje("mensajeSolicitud", "No se pudo registrar el prestamo: " + error.message, "error");
     } finally {
         btn.disabled = false;
     }
 }
 
-// 4. Registrar Devolucion
-function cambioEstadoDevolucion() {
-    const estado = elemento("devEstadoMaterial").value;
-    const obs = elemento("devObservaciones");
+// 4. Devolucion de Material
+function generarNuevaClaveDevolucion() {
+    const clave = generarUuid();
+    if ($("devClaveIdempotencia")) {
+        $("devClaveIdempotencia").value = clave;
+    }
+    return clave;
+}
+
+function cambiarEstadoDevolucion() {
+    const estado = $("devEstadoMaterial").value;
+    const obs = $("devObservaciones");
+    const sancion = $("devMontoSancion");
+
     if (estado === "DANADO_IRREPARABLE") {
-        if (!obs.value || obs.value === "Material recibido en condiciones optimas") {
-            obs.value = "Articulo con dano irreparable constatado en recepcion.";
+        if (!obs.value || obs.value === "Material recibido en buen estado.") {
+            obs.value = "Articulo con dano constatado en la recepcion.";
         }
+        if (sancion) sancion.value = "250.00";
     } else if (estado === "REQUIERE_MANTENIMIENTO") {
-        if (!obs.value || obs.value === "Material recibido en condiciones optimas") {
-            obs.value = "Presenta desgaste que requiere revision tecnica.";
+        if (!obs.value || obs.value === "Material recibido en buen estado.") {
+            obs.value = "Presenta desgaste, se envia a revision tecnica.";
         }
+        if (sancion) sancion.value = "0.00";
     } else {
         if (obs.value.includes("dano") || obs.value.includes("desgaste")) {
-            obs.value = "Material recibido en condiciones optimas";
+            obs.value = "Material recibido en buen estado.";
         }
+        if (sancion) sancion.value = "0.00";
     }
 }
 
 async function registrarDevolucion() {
-    const idSolicitud = elemento("devIdSolicitud").value.trim();
-    const codigoArticulo = elemento("devCodigoArticulo").value.trim();
-    const idUsuario = parseInt(elemento("devIdUsuario").value, 10);
-    const estadoMaterial = elemento("devEstadoMaterial").value;
-    const observaciones = elemento("devObservaciones").value.trim() || "Devolucion ordinaria de material";
-    const btn = elemento("btnDevolver");
+    const clave = $("devClaveIdempotencia") ? $("devClaveIdempotencia").value.trim() : generarUuid();
+    const idSolicitud = $("devIdSolicitud").value.trim();
+    const codigoArticulo = $("devCodigoArticulo").value.trim();
+    const idUsuario = parseInt($("devIdUsuario").value, 10);
+    const estadoMaterial = $("devEstadoMaterial").value;
+    const observaciones = $("devObservaciones").value.trim() || "Devolucion de material";
+    const montoSancion = parseFloat($("devMontoSancion") ? $("devMontoSancion").value : "0.00") || 0.0;
+    const btn = $("btnDevolver");
 
     const payload = {
+        claveIdempotencia: clave,
         idSolicitud: idSolicitud,
         codigoArticulo: codigoArticulo,
         idUsuario: idUsuario,
         estadoMaterial: estadoMaterial,
         observaciones: observaciones,
+        montoSancion: montoSancion,
         version: 0
     };
 
     try {
         btn.disabled = true;
-        mostrarMensaje("mensajeDevolucion", "Procesando devolucion en Servicio 4...");
-        elemento("mensajeDevolucion").className = "mensaje-box info";
+        mostrarMensaje("mensajeDevolucion", "Guardando devolucion...", "info");
 
-        const respuesta = await solicitarJson(API_DEVOLUCIONES, {
+        const respuesta = await pedirJson(API_DEVOLUCIONES, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         });
 
-        const sancionTexto = respuesta.montoSancion > 0
-            ? ` Sancion aplicada: $${respuesta.montoSancion.toFixed(2)}.`
+        const textoSancion = respuesta.montoSancion > 0
+            ? ` Sancion aplicada: $${Number(respuesta.montoSancion).toFixed(2)}.`
             : ` Sin sanciones aplicadas.`;
 
         mostrarMensaje(
             "mensajeDevolucion",
-            `Devolucion exitosa. Folio: ${respuesta.folio}.${sancionTexto} Inventario actualizado.`
+            `Devolucion guardada con exito. Folio: ${respuesta.folio}.${textoSancion}`,
+            "exito"
         );
 
-        // Recargar el historial y el articulo
+        // Prellenar campo del comprobante SOAP con el nuevo folio
+        if ($("soapFolio")) {
+            $("soapFolio").value = respuesta.folio;
+        }
+
+        // Recargar historial y datos del articulo
         cargarHistorialDevoluciones();
         consultarArticulo();
+
+        // Generar nueva clave para la siguiente entrega
+        generarNuevaClaveDevolucion();
+
     } catch (error) {
-        mostrarMensaje("mensajeDevolucion", "Error al registrar la devolucion: " + error.message, true);
+        mostrarMensaje("mensajeDevolucion", "Error al registrar la devolucion: " + error.message, "error");
     } finally {
         btn.disabled = false;
     }
 }
 
+// Cancelar una devolucion registrada
+async function cancelarDevolucion(id, version) {
+    if (!confirm(`¿Confirmas la cancelacion de la devolucion #${id}?`)) {
+        return;
+    }
+
+    try {
+        mostrarMensaje("mensajeHistorial", "Cancelando registro...", "info");
+
+        const url = `${API_DEVOLUCIONES}/${id}/cancelar?version=${version}`;
+        await pedirJson(url, { method: "PUT" });
+
+        mostrarMensaje("mensajeHistorial", `Devolucion #${id} cancelada correctamente.`, "exito");
+        cargarHistorialDevoluciones();
+    } catch (error) {
+        mostrarMensaje("mensajeHistorial", "No se pudo cancelar: " + error.message, "error");
+    }
+}
+
 // 5. Historial de Devoluciones
 async function cargarHistorialDevoluciones() {
-    const cuerpo = elemento("cuerpoDevoluciones");
+    const cuerpo = $("cuerpoDevoluciones");
     if (!cuerpo) return;
 
     try {
-        const lista = await solicitarJson(API_DEVOLUCIONES);
+        const lista = await pedirJson(API_DEVOLUCIONES);
         cuerpo.innerHTML = "";
 
         if (!lista || lista.length === 0) {
-            cuerpo.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--muted);">No hay devoluciones registradas.</td></tr>`;
+            cuerpo.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--muted);">No hay devoluciones registradas.</td></tr>`;
             return;
         }
 
-        // Mostrar las devoluciones mas recientes primero
+        // Mostrar las mas recientes primero
         const ordenadas = [...lista].reverse();
 
         ordenadas.forEach(item => {
-            const tr = document.createElement("tr");
+            const fila = document.createElement("tr");
 
             let badgeClass = "badge-disponible";
             let estadoTexto = "Buen Estado";
@@ -384,7 +367,7 @@ async function cargarHistorialDevoluciones() {
                 estadoTexto = "Mantenimiento";
             } else if (item.estadoMaterial === "DANADO_IRREPARABLE") {
                 badgeClass = "badge-danado";
-                estadoTexto = "Danado Irreparable";
+                estadoTexto = "Danado";
             }
 
             const fechaFormat = item.fechaDevolucion 
@@ -395,11 +378,16 @@ async function cargarHistorialDevoluciones() {
                 ? `<strong style="color: var(--danger);">$${Number(item.montoSancion).toFixed(2)}</strong>`
                 : `$0.00`;
 
-            const solicitudCorta = (item.idSolicitud && item.idSolicitud.length > 18)
-                ? item.idSolicitud.substring(0, 15) + "..."
+            const solicitudCorta = (item.idSolicitud && item.idSolicitud.length > 16)
+                ? item.idSolicitud.substring(0, 13) + "..."
                 : (item.idSolicitud || "-");
 
-            tr.innerHTML = `
+            const esCancelada = item.observaciones && item.observaciones.startsWith("[CANCELADA]");
+            const accionCancelar = esCancelada
+                ? `<span style="color: var(--muted); font-size: 0.8rem;">Cancelada</span>`
+                : `<button type="button" class="btn btn-outline btn-sm" style="color: var(--danger);" onclick="cancelarDevolucion(${item.id}, ${item.version})">Cancelar</button>`;
+
+            fila.innerHTML = `
                 <td><strong>${item.folio || '-'}</strong></td>
                 <td title="${item.idSolicitud || ''}">${solicitudCorta}</td>
                 <td>${item.codigoArticulo || '-'}</td>
@@ -408,29 +396,81 @@ async function cargarHistorialDevoluciones() {
                 <td><span class="badge ${badgeClass}">${estadoTexto}</span></td>
                 <td>${sancionTexto}</td>
                 <td>${item.observaciones || '-'}</td>
+                <td style="white-space: nowrap; display: flex; gap: 4px;">
+                    ${accionCancelar}
+                    <button type="button" class="btn btn-outline btn-sm" onclick="verComprobante('${item.folio}')">Comprobante</button>
+                </td>
             `;
-            cuerpo.appendChild(tr);
+            cuerpo.appendChild(fila);
         });
     } catch (error) {
-        cuerpo.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--danger);">Error al cargar historial: ${error.message}</td></tr>`;
+        cuerpo.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--danger);">Error al cargar historial: ${error.message}</td></tr>`;
     }
 }
 
-// Inicializacion al cargar la pagina
+// 6. Consulta de Comprobante / Incidencias (SOAP)
+function verComprobante(folio) {
+    if ($("soapFolio")) {
+        $("soapFolio").value = folio;
+    }
+    consultarComprobanteSoap();
+}
+
+async function consultarComprobanteSoap() {
+    const folioInput = $("soapFolio");
+    const visor = $("resultadoSoap");
+    if (!folioInput || !folioInput.value.trim()) return;
+
+    const folio = folioInput.value.trim();
+
+    try {
+        mostrarMensaje("mensajeSoap", `Consultando comprobante para el folio ${folio}...`, "info");
+        if (visor) visor.style.display = "none";
+
+        const url = `${API_DEVOLUCIONES}/transformacion-soap/${encodeURIComponent(folio)}`;
+        const datos = await pedirJson(url);
+
+        mostrarMensaje("mensajeSoap", "Comprobante consultado exitosamente.", "exito");
+
+        if (visor) {
+            $("soapResFolio").textContent = datos.folio || "-";
+            $("soapResArticulo").textContent = datos.articulo || "-";
+            $("soapResCondicion").textContent = datos.condicion || "-";
+            $("soapResPenalizacion").textContent = datos.penalizacion ? `$${Number(datos.penalizacion).toFixed(2)}` : "$0.00";
+            $("soapResReposicion").textContent = datos.requiereReposicion ? "Si, requiere compra de activo" : "No requerida";
+            $("soapResDictamen").textContent = datos.dictamenTecnico || "-";
+            $("soapResComentarios").textContent = datos.comentarios || "-";
+            $("soapJsonRaw").textContent = JSON.stringify(datos, null, 2);
+            visor.style.display = "block";
+        }
+    } catch (error) {
+        mostrarMensaje("mensajeSoap", "No se pudo consultar el comprobante: " + error.message, "error");
+        if (visor) visor.style.display = "none";
+    }
+}
+
+// Alternar vista del JSON sin formato
+function alternarJsonRaw() {
+    const pre = $("soapJsonRaw");
+    if (!pre) return;
+    pre.style.display = pre.style.display === "none" ? "block" : "none";
+}
+
+// Inicializar al cargar el documento
 window.addEventListener("DOMContentLoaded", () => {
-    // Establecer fecha de hoy en el formulario de solicitud
+    // Fecha de hoy por defecto en el prestamo
     const hoy = new Date().toISOString().split("T")[0];
-    if (elemento("solFechaUso")) {
-        elemento("solFechaUso").value = hoy;
+    if ($("solFechaUso")) {
+        $("solFechaUso").value = hoy;
     }
 
-    // Inicializar identificador de operacion
-    inicializarUuidSolicitud();
+    // Inicializar clave de entrega
+    generarNuevaClaveDevolucion();
 
-    // Consultar automaticamente articulo 1 y usuario 1
+    // Cargar consultas iniciales de ejemplo
     consultarArticulo();
     consultarUsuario();
 
-    // Cargar historial de devoluciones
+    // Cargar historial de entregas
     cargarHistorialDevoluciones();
 });

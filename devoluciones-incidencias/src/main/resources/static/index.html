@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prestamos y Devoluciones de Material Deportivo</title>
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --primary-hover: #1d4ed8;
+            --success: #15803d;
+            --success-hover: #166534;
+            --danger: #b91c1c;
+            --warning: #b45309;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 24px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3a8a, #2563eb);
+            color: #ffffff;
+            padding: 24px 28px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(30, 58, 138, 0.12);
+        }
+
+        .header h1 {
+            margin: 0 0 6px 0;
+            font-size: 1.45rem;
+            font-weight: 700;
+        }
+
+        .header p {
+            margin: 0;
+            font-size: 0.95rem;
+            opacity: 0.92;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 10px;
+            padding: 22px 26px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+        }
+
+        .card h2 {
+            margin: 0 0 16px 0;
+            font-size: 1.15rem;
+            color: var(--primary);
+            border-bottom: 2px solid #e0e7ff;
+            padding-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 680px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            margin-bottom: 14px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 0.88rem;
+            color: #334155;
+        }
+
+        input[type="number"],
+        input[type="text"],
+        input[type="date"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.92rem;
+            font-family: inherit;
+            color: var(--text);
+            background: #ffffff;
+            transition: border-color 0.15s ease-in-out;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 9px 16px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: white;
+            background: var(--primary);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s ease-in-out;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: var(--primary-hover);
+        }
+
+        .btn-success {
+            background: var(--success);
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: var(--success-hover);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+        }
+
+        .btn-outline:hover:not(:disabled) {
+            background: #f1f5f9;
+            color: var(--text);
+        }
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .mensaje-box {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .mensaje-box.info {
+            display: block;
+            background: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+
+        .mensaje-box.exito {
+            display: block;
+            background: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .mensaje-box.error {
+            display: block;
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            background: #f8fafc;
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin-top: 14px;
+            border: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        .info-grid strong {
+            color: #475569;
+            display: block;
+            font-size: 0.8rem;
+            margin-bottom: 2px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 9999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .badge-disponible {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .badge-mantenimiento {
+            background: #fef3c7;
+            color: #b45309;
+        }
+
+        .badge-danado {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+            font-size: 0.88rem;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 9px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        .campo-ayuda {
+            display: block;
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 0.8rem;
+        }
+
+        .comprobante-card {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 14px;
+        }
+
+        .comprobante-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+        }
+
+        .dictamen-box {
+            background: #ffffff;
+            border-left: 4px solid var(--primary);
+            padding: 10px 14px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+    </style>
+    <script src="app.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Encabezado -->
+        <header class="header">
+            <h1>Prestamos y Devoluciones de Material Deportivo</h1>
+            <p>Control de inventario, registro de solicitudes, devolucion de material y revision de incidencias</p>
+        </header>
+
+        <!-- Seccion 1: Catalogo de Material Deportivo -->
+        <section class="card">
+            <h2>1. Material Deportivo</h2>
+            <form id="formConsultaArticulo" onsubmit="event.preventDefault(); consultarArticulo();">
+                <div class="form-group">
+                    <label for="articuloId">ID del articulo:</label>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <input type="number" id="articuloId" min="1" value="1" placeholder="Ej. 1" required style="max-width: 180px;">
+                        <button type="submit" id="btnConsultarArticulo" class="btn">Buscar material</button>
+                        <button type="button" class="btn btn-outline" onclick="cargarCatalogoCompleto();">Ver inventario completo</button>
+                    </div>
+                </div>
+            </form>
+
+            <div id="mensajeArticulo" class="mensaje-box"></div>
+
+            <div id="detalleArticulo" class="info-grid" style="display: none;">
+                <div><strong>Codigo</strong><span id="artCodigo">-</span></div>
+                <div><strong>Nombre</strong><span id="artNombre">-</span></div>
+                <div><strong>Deporte</strong><span id="artDeporte">-</span></div>
+                <div><strong>En buen estado</strong><span id="artBuenEstado" style="color: var(--success); font-weight: bold;">-</span></div>
+                <div><strong>En mantenimiento</strong><span id="artMantenimiento" style="color: var(--warning);">-</span></div>
+                <div><strong>Danados</strong><span id="artDanadas" style="color: var(--danger);">-</span></div>
+            </div>
+
+            <div id="contenedorTablaArticulos" style="display: none; margin-top: 14px; overflow-x: auto;">
+                <table id="tablaArticulos">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Codigo</th>
+                            <th>Articulo</th>
+                            <th>Deporte</th>
+                            <th>Disponibles</th>
+                            <th>Mantenimiento</th>
+                            <th>Danados</th>
+                            <th>Accion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpoTablaArticulos"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Seccion 2: Consulta de Usuario Solicitante -->
+        <section class="card">
+            <h2>2. Datos del Usuario</h2>
+            <form id="formConsultaUsuario" onsubmit="event.preventDefault(); consultarUsuario();">
+                <div class="form-group">
+                    <label for="usuarioId">ID del usuario:</label>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <input type="number" id="usuarioId" min="1" value="1" placeholder="Ej. 1" required style="max-width: 180px;">
+                        <button type="submit" id="btnConsultarUsuario" class="btn">Buscar usuario</button>
+                    </div>
+                </div>
+            </form>
+
+            <div id="mensajeUsuario" class="mensaje-box"></div>
+
+            <div id="detalleUsuario" class="info-grid" style="display: none;">
+                <div><strong>Matricula</strong><span id="usrMatricula">-</span></div>
+                <div><strong>Nombre</strong><span id="usrNombre">-</span></div>
+                <div><strong>Correo</strong><span id="usrCorreo">-</span></div>
+                <div><strong>Tipo</strong><span id="usrTipo">-</span></div>
+                <div><strong>Estado</strong><span id="usrEstado">-</span></div>
+                <div><strong>Limite de prestamos</strong><span id="usrLimite">-</span></div>
+            </div>
+        </section>
+
+        <!-- Seccion 3: Registrar Solicitud de Prestamo -->
+        <section class="card">
+            <h2>3. Solicitar Prestamo de Material</h2>
+            <form id="formSolicitud" onsubmit="event.preventDefault(); registrarSolicitud();">
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="solIdArticulo">ID del articulo a solicitar:</label>
+                        <input type="number" id="solIdArticulo" min="1" value="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="solIdUsuario">ID del usuario solicitante:</label>
+                        <input type="number" id="solIdUsuario" min="1" value="1" required>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="solCantidad">Cantidad:</label>
+                        <input type="number" id="solCantidad" min="1" max="10" value="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="solFechaUso">Fecha de uso:</label>
+                        <input type="date" id="solFechaUso" required>
+                    </div>
+                </div>
+
+                <div style="margin-top: 6px;">
+                    <button type="submit" id="btnSolicitar" class="btn btn-success">Registrar Solicitud</button>
+                </div>
+            </form>
+
+            <div id="mensajeSolicitud" class="mensaje-box"></div>
+        </section>
+
+        <!-- Seccion 4: Registrar Devolucion de Material -->
+        <section class="card">
+            <h2>4. Registrar Devolucion de Material</h2>
+            <form id="formDevolucion" onsubmit="event.preventDefault(); registrarDevolucion();">
+                <div class="form-group" style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid var(--border);">
+                    <label for="devClaveIdempotencia">Clave de entrega (identificador unico):</label>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <input type="text" id="devClaveIdempotencia" placeholder="Clave unica de operacion" required style="flex: 1; font-family: monospace; font-size: 0.85rem;">
+                        <button type="button" class="btn btn-outline btn-sm" onclick="generarNuevaClaveDevolucion();">Nueva clave</button>
+                    </div>
+                    <span class="campo-ayuda">Permite registrar o reintentar la entrega sin duplicar registros.</span>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="devIdSolicitud">Folio o ID de solicitud:</label>
+                        <input type="text" id="devIdSolicitud" placeholder="Ej. 1 o folio del prestamo" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="devCodigoArticulo">Codigo del articulo:</label>
+                        <input type="text" id="devCodigoArticulo" placeholder="Ej. BAL-FUT-01" required>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="devIdUsuario">ID del usuario que entrega:</label>
+                        <input type="number" id="devIdUsuario" min="1" value="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="devEstadoMaterial">Estado de recepcion del material:</label>
+                        <select id="devEstadoMaterial" required onchange="cambiarEstadoDevolucion();">
+                            <option value="BUEN_ESTADO">Buen estado</option>
+                            <option value="REQUIERE_MANTENIMIENTO">Requiere mantenimiento (desgaste)</option>
+                            <option value="DANADO_IRREPARABLE">Danado irreparable (aplica sancion de $250.00)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="devMontoSancion">Sancion a aplicar ($):</label>
+                        <input type="number" id="devMontoSancion" min="0" step="0.01" value="0.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="devObservaciones">Observaciones:</label>
+                        <input type="text" id="devObservaciones" placeholder="Ej. Material recibido en buen estado." required>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
+                    <button type="submit" id="btnDevolver" class="btn btn-success">Registrar Devolucion</button>
+                    <button type="button" class="btn btn-outline" onclick="cargarHistorialDevoluciones();">Actualizar historial</button>
+                </div>
+            </form>
+
+            <div id="mensajeDevolucion" class="mensaje-box"></div>
+        </section>
+
+        <!-- Seccion 5: Historial de Devoluciones -->
+        <section class="card">
+            <h2>5. Historial de Devoluciones</h2>
+            <div style="overflow-x: auto;">
+                <table id="tablaDevoluciones">
+                    <thead>
+                        <tr>
+                            <th>Folio</th>
+                            <th>Solicitud</th>
+                            <th>Articulo</th>
+                            <th>Usuario</th>
+                            <th>Fecha</th>
+                            <th>Estado</th>
+                            <th>Sancion</th>
+                            <th>Observaciones</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpoDevoluciones">
+                        <tr><td colspan="9" style="text-align: center; color: var(--muted);">Cargando entregas...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="mensajeHistorial" class="mensaje-box"></div>
+        </section>
+
+        <!-- Seccion 6: Comprobante y Reporte de Incidencias (SOAP) -->
+        <section class="card">
+            <h2>6. Comprobante de Incidencias (SOAP)</h2>
+            <p style="color: var(--muted); margin-top: -6px; margin-bottom: 14px; font-size: 0.9rem;">
+                Consulta el reporte oficial de incidencias procesado por el servicio SOAP y formateado para visualizacion.
+                <a href="http://localhost:9010/ws/incidencias.wsdl" target="_blank" style="color: var(--primary); text-decoration: underline; margin-left: 6px;">
+                    Ver contrato WSDL
+                </a>
+            </p>
+
+            <form id="formSoap" onsubmit="event.preventDefault(); consultarComprobanteSoap();">
+                <div class="form-group">
+                    <label for="soapFolio">Folio de devolucion:</label>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <input type="text" id="soapFolio" placeholder="Ej. DEV-XXXXXXXX" required style="max-width: 240px; font-family: monospace;">
+                        <button type="submit" id="btnSoap" class="btn">Consultar comprobante</button>
+                    </div>
+                </div>
+            </form>
+
+            <div id="mensajeSoap" class="mensaje-box"></div>
+
+            <div id="resultadoSoap" class="comprobante-card" style="display: none;">
+                <div class="comprobante-grid">
+                    <div><strong>Folio</strong><span id="soapResFolio">-</span></div>
+                    <div><strong>Articulo</strong><span id="soapResArticulo">-</span></div>
+                    <div><strong>Condicion</strong><span id="soapResCondicion">-</span></div>
+                    <div><strong>Penalizacion</strong><span id="soapResPenalizacion" style="color: var(--danger); font-weight: bold;">-</span></div>
+                    <div><strong>Reposicion de activo</strong><span id="soapResReposicion">-</span></div>
+                    <div><strong>Observaciones</strong><span id="soapResComentarios">-</span></div>
+                </div>
+                <div class="dictamen-box">
+                    <strong>Dictamen tecnico:</strong>
+                    <div id="soapResDictamen" style="margin-top: 4px;">-</div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="alternarJsonRaw();">Ver respuesta JSON completa</button>
+                </div>
+                <pre id="soapJsonRaw" style="display: none; background: #1e293b; color: #f8fafc; padding: 12px; border-radius: 6px; font-size: 0.82rem; overflow-x: auto; margin-top: 10px;"></pre>
+            </div>
+        </section>
+    </div>
+</body>
+</html>
